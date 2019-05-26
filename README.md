@@ -21,9 +21,10 @@ You should be given a username and password to MongoDB.
 
 To use MongoDB on the server:
 
-```mongo #start mongodb
-   use ghtorrent #choose database
-   db.auth("name","password") #authenticate
+```
+mongo #start mongodb
+use ghtorrent #choose database
+db.auth("name","password") #authenticate
    
 ```
 
