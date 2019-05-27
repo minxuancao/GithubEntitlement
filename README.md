@@ -105,7 +105,7 @@ Note:
  
 ## Logging.
 
-Script running logs are stored preprocess.log. It stores how long each repo took to process.
+Script running logs are stored `preprocess.log`. It stores how long each repo took to process.
 
 ## Guide to running all of these
 
