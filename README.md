@@ -91,7 +91,7 @@ Uses Stanford Politeness API to give a positive score and negative score. Each c
 
 Example usage:
 ``` 
-python3 preprocessing.py -n -p number_of_processors_to_start_up
+python3 preprocessing.py -n -p 5 # don't repeat preprocess issues, use 5 processors.
 ```
 Flags:
 
