@@ -25,7 +25,6 @@ To use MongoDB on the server:
 mongo #start mongodb
 use ghtorrent #choose database
 db.auth("name","password") #authenticate
-   
 ```
 
 
@@ -39,7 +38,6 @@ You can look at an example by running:
 ```
 db.michelle_processed_comments_test.findOne() # show a processed comment
 db.michelle_processed_issues_test.findOne() #show a processed issue
-
 ```
 
 Related Packages the pipeline uses to generate features:
