@@ -75,17 +75,21 @@ number of polite words(not yet implemented)
 
 number of insult words (improvement: could use a more complete set.)
 
-Perspective Score: sends processed text (check source code) to the Google Perspective score and get back a score of toxicity. For issue aggregation, an average of the top 2 toxic comments is calculated. 
+Perspective Score
 
-Senti4SD: uses Senti4SD to classify a comment as either positive, neutral or negative. For issue aggregation: a percentage of pos, neg, neutral comments are calculated.
+Sends processed text (check source code) to the Google Perspective score and get back a score of toxicity. For issue aggregation, an average of the top 2 toxic comments is calculated. 
 
-Stanford Politeness API:
+Senti4SD
 
-In addition, here is a description of the text-level features we extract from comments.
+Uses Senti4SD to classify a comment as either positive, neutral or negative. For issue aggregation: a percentage of pos, neg, neutral comments are calculated.
 
-Running this data pipeline
+Stanford Politeness API
 
-Use tmux. 
 
-How long would this take.
+
+## Running this data pipeline
+
+ 
+
+## How long would this take.
 
