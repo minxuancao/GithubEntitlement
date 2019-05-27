@@ -85,11 +85,23 @@ Uses Senti4SD to classify a comment as either positive, neutral or negative. For
 
 Stanford Politeness API
 
-
+Uses Stanford Politeness API to give a positive score and negative score. Each comment has a pair of politeness score and each issue has one. There is no aggregation here. Both are directly evaluated by the Stanford Politeness API.
 
 ## Running this data pipeline
 
- 
+Example usage:
+``` 
+python3 preprocessing.py -n -p number_of_processors_to_start_up
+```
+Flags:
 
+-n: short for nonrepeat. Optional. If this flag is specified, then we would not process an issue if it already exists in the specified.
+
+-p: specifies the number of processors to use. Not Optional.
+
+Note: 
+1. Must use `python3` to avoid Unicode error.
+2. Before running the pipeline, replace all addresses to addresses in your directory.
+ 
 ## How long would this take.
 
