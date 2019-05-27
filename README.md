@@ -29,13 +29,18 @@ db.auth("name","password") #authenticate
 ```
 
 
-Description of the data pipeline
+## The Data Pipeline
 
 The data pipeine reads comments and issues collections from MongoDB database: ghtorrent, cleans the data, generates 
-various features and writes generated features back into your specified collections. Currently, we are saving features for each
-comments and after that, aggregating comments of each issue to create features for each issue.
+various features and writes generated features back into your specified collections. Currently, we are saving features for each comments and after that, aggregating comments of each issue to create features for each issue.
 
-An example to look at is: 
+You can look at an example by running:
+
+```
+db.michelle_processed_comments_test.findOne() # show a processed comment
+db.michelle_processed_issues_test.findOne() #show a processed issue
+
+```
 
 Related Packages the pipeline uses to generate features:
 
