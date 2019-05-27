@@ -103,5 +103,8 @@ Note:
 1. Must use `python3` to avoid Unicode error.
 2. Before running the pipeline, replace all addresses to addresses in your directory.
  
-## How long would this take.
+## Logging.
+
+Script running logs are stored preprocess.log. It stores how long each repo took to process.
+
 
