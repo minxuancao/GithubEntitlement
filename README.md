@@ -1,21 +1,21 @@
 # GithubEntitlement
 Source code for running data pipeline for Github Entitlement research at CMU Strudel.
 
-Before we start:
+## Before we start:
 
-Pycharm
+### Pycharm
 
 Writing code on the server can be quite annoying. I would recommend using the "premium" version of PyCharm and check out their "remote deployment" feature, which allows you to edit code locally and deploy it on the server easily. You could obtain a version by using your institutional email.
 
-TMUX
+### TMUX
 
 A great tool for running programs on the server so that you don't have to keep your computer on all the time.
 
-Perspective API 
+### Perspective API 
 
 Request a Perspective API key here: https://www.perspectiveapi.com/#/start. Don't use your CMU email account for generating keys. It doesn't work. It might be best to use a personal google email address.
 
-MongoDB 
+### MongoDB 
 
 You should be given a username and password to MongoDB.
 
