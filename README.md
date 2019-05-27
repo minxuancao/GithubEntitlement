@@ -39,6 +39,42 @@ You can look at an example by running:
 db.michelle_processed_comments_test.findOne() # show a processed comment
 db.michelle_processed_issues_test.findOne() #show a processed issue
 ```
+## Features
+
+The data pipeline current generates the following text-level features for each comment in a issue, and aggregating to create features for the issue:
+
+length of text
+
+average length of each word
+
+number of punctuations
+
+number of question and exclamation marks
+
+number of 1 letter word
+
+number of capitalized letters
+
+number of urls
+
+number of tokens with non-alpha characters in the middle
+
+number of modal words
+
+number of unknown words as compared to dictionary 
+
+number of emojis
+
+number of markdowns
+
+number of mentions
+
+number of occurence of "+1"
+
+number of polite words(not yet implemented)
+
+number of insult words (improvement: could use a more complete set.)
+
 
 Related Packages the pipeline uses to generate features:
 
