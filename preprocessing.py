@@ -41,7 +41,6 @@ def connect_Mongo():
     return db
 
 def get_perspective_score(text):
-    #API_KEY = "AIzaSyBpqnKD1eyFU5BBkSvP4qQp6azbc6iNmNU"
     p = Perspective(API_KEY)
     try:
         comment = p.score(text,tests=["TOXICITY"])
