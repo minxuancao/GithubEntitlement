@@ -91,13 +91,18 @@ Uses Stanford Politeness API to give a positive score and negative score. Each c
 
 Example usage:
 ``` 
-python3 preprocessing.py -n -p 5 # don't repeat preprocess issues, use 5 processors.
+python3 preprocessing.py -n -p 5 -i michelle_processed_issues_test -c michelle_processed_comments_test 
+#don't repeat preprocess issues, use 5 processors. use michelle_processed_issues_test as issue collection. use michelle_processed_comments_test as comment collection.
 ```
 Flags:
 
 -n: short for nonrepeat. Optional. If this flag is specified, then we would not process an issue if it already exists in the specified.
 
 -p: specifies the number of processors to use. Not Optional.
+
+-i: collection to store processed issues. If the issue already exists in this collection, it will not be processed. Not Optional.
+
+-c: collection to store processed comments. Not Optional.
 
 Note: 
 1. Must use `python3` to avoid Unicode error.
@@ -117,4 +122,3 @@ I will complete these features this week:
 
 1. Ideally, there should be an easy way for adding new features to preprocess so that old features don't need to be recalculated.
 
-2. Right now, the MongoDB collection is hardcoded in the code, which is hard for maintenance. I will change this.

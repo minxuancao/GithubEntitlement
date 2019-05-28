@@ -206,7 +206,7 @@ def process_comment(doc):
            "perspective_score": perspective_score,
             "text": text}
 
-def consumer(repo,non_repeat):
+def consumer(repo,non_repeat,issue_collection,comment_collection):
 
     db = connect_Mongo()
 
@@ -221,7 +221,7 @@ def consumer(repo,non_repeat):
         # check to see if the issue is already processed
         if non_repeat:
             id = "%s/%s/%d" % (query_dict["repo"], query_dict["owner"], issue_id)
-            if db.michelle_processed_issues_test.find_one({"_id":id}):
+            if db[issue_collection].find_one({"_id":id}):
                 logging.info("%s already processed" % id)
                 continue
 
@@ -356,11 +356,11 @@ def consumer(repo,non_repeat):
         #logging.debug(total_comment_info)
 
         # insert total_comment_info to database
-        db.michelle_processed_issues.replace_one({"_id":total_comment_info["_id"]},total_comment_info,upsert=True)
+        db[issue_collection].replace_one({"_id":total_comment_info["_id"]},total_comment_info,upsert=True)
 
         # insert each comment_info to database
         for comment_info in comment_info_l:
-            db.michelle_processed_comments.replace_one({"_id":comment_info["_id"]},comment_info,upsert=True)
+            db[comment_collection].replace_one({"_id":comment_info["_id"]},comment_info,upsert=True) 
         #logging.info("%s processing took %d" % (query_dict, time.time() - issue_start))
 
     return query_dict
@@ -374,7 +374,10 @@ if __name__ == "__main__":
     non_repeat = False
     parser = argparse.ArgumentParser()
     parser.add_argument("-n","--nonrepeat", help="does not recaluculate documents already in collections",action="store_true")
-    parser.add_argument("-p","--num_processor",type= int,help="number of processes to start up")
+    parser.add_argument("-p","--num_processor",type=int,help="number of processes to start up")
+    parser.add_argument("-i","--issue",type=str,help="collection to save processed issues")
+    parser.add_argument("-c","--comment",type=str,help="collection to save processed comments")
+
     args = parser.parse_args()
     if args.nonrepeat:
         logging.info("non-repeat is turned on")
@@ -391,7 +394,7 @@ if __name__ == "__main__":
 
     start = time.time()
     chunk_size = 1 # set a large chunksize when repos is large!!!
-    for repo in pool.imap_unordered(partial(consumer,non_repeat=non_repeat),repos):
+    for repo in pool.imap_unordered(partial(consumer,non_repeat=non_repeat,issue_collection=args.issue,comment_collection=args.comment),repos):
         logging.info("Processing %s took %d s " % (repo, time.time()-start))
     pool.close()
 
