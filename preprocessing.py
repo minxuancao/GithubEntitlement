@@ -30,15 +30,18 @@ core_nlp_pickle_address = "/data2/michelle/GithubEntitlement/stanford-corenlp-fu
 politness_env = "/data2/michelle/GithubEntitlement/politeness/venv/bin/python" #address of stanford politeness running environment
 politeness_address = "/data2/michelle/GithubEntitlement/politeness/"
 stanford_politeness_score_address = "/data2/michelle/GithubEntitlement/politeness/scores/"
+API_KEY = "API_KEY"
+MongoDB_name = "NAME"
+MongoDB_password = "PASSWORD"
 
 def connect_Mongo():
     client = MongoClient(maxPoolSize=10000)
     db = client.ghtorrent
-    db.authenticate(name="ght",password="ght")
+    db.authenticate(name=MongoDB_name,password=MongoDB_password)
     return db
 
 def get_perspective_score(text):
-    API_KEY = "AIzaSyBpqnKD1eyFU5BBkSvP4qQp6azbc6iNmNU"
+    #API_KEY = "AIzaSyBpqnKD1eyFU5BBkSvP4qQp6azbc6iNmNU"
     p = Perspective(API_KEY)
     try:
         comment = p.score(text,tests=["TOXICITY"])
@@ -202,7 +205,6 @@ def process_comment(doc):
            "num_mention": num_mention,
            "num_plus_one": num_plus_one,
            "perspective_score": perspective_score,
-           #"text": text.decode("utf-8")
             "text": text}
 
 def consumer(repo,non_repeat):
@@ -355,11 +357,11 @@ def consumer(repo,non_repeat):
         #logging.debug(total_comment_info)
 
         # insert total_comment_info to database
-        db.michelle_processed_issues_test.replace_one({"_id":total_comment_info["_id"]},total_comment_info,upsert=True)
+        db.michelle_processed_issues.replace_one({"_id":total_comment_info["_id"]},total_comment_info,upsert=True)
 
         # insert each comment_info to database
         for comment_info in comment_info_l:
-            db.michelle_processed_comments_test.replace_one({"_id":comment_info["_id"]},comment_info,upsert=True)
+            db.michelle_processed_comments.replace_one({"_id":comment_info["_id"]},comment_info,upsert=True)
         #logging.info("%s processing took %d" % (query_dict, time.time() - issue_start))
 
     return query_dict
@@ -369,22 +371,24 @@ if __name__ == "__main__":
     #config logging
     logging.basicConfig(filename='preprocess.log',filemode='w',format='%(name)s - %(levelname)s - %(message)s',level=logging.INFO)
 
+    #parsing flags
     non_repeat = False
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-n","--nonrepeat", help="does not recaluculate documents already in collections",action="store_true")
+    parser.add_argument("-p","--num_processor",type= int,help="number of processes to start up")
     args = parser.parse_args()
     if args.nonrepeat:
         logging.info("non-repeat is turned on")
+        logging.info("using %d number of processor" % (args.num_processor))
         non_repeat = True
 
     # read in the needed repos
     repo_df = pd.read_csv("issues_by_reporter_2017_stratified.csv")
-    repos = repo_df["find_str"][-3:] #take the last 3 elements
+    #repos = repo_df["find_str"][-3:] #take the last 3 elements
+    repos = repo_df["find_str"]
 
     # iterate through my collection to preprocess
-    num_process = 2
-    pool = mp.Pool(processes=num_process)
+    pool = mp.Pool(processes=args.num_processor)
 
     start = time.time()
     chunk_size = 1 # set a large chunksize when repos is large!!!
@@ -393,6 +397,7 @@ if __name__ == "__main__":
     pool.close()
 
 
+    ### running the script using a single process, for debugging purpose
     # for repo in repos:
     #     logging.info("Started Processing: %s" % (repo))
     #     start = time.time()
@@ -401,37 +406,6 @@ if __name__ == "__main__":
     #     logging.info("Finished Processing: %s ; time took: %d" % (repo,(end-start)))
 
 
-
-
-
-    # limited = 10000 # limit to 10,000 documents
-    # skipped = 0
-    #
-    # while True:
-    #
-    #     if skipped > document_count:
-    #         break
-    #
-    #     cursor = db.issue_comments.find({"owner": "MicrosoftDocs","repo":"azure-docs"}).skip(skipped).limit(limited);
-    #
-    #     result = pool.map(consumer,cursor); #func
-    #     results.extend(result)
-    #
-    #     skipped += limited
-    #     print("[-] Skipping {}".format(skipped))
-    #
-    # print(len(results))
-
-    # #write df['text'] to csv
-    # csv_addr = "Senti4SD/ClassificationTask/" #probably change to cur dir...
-    # df['text'].to_csv(csv_addr+"entitlement.csv",index=False)
-    # #run senti4sd
-    # df['senti4sd'] = get_senti4SD(csv_addr,"entitlement.csv")
-    # # add line to data frame
-    # df.to_csv("preprocessed.csv",encoding='utf-8')
-    # #close the connection
-    # print("closing connection!")
-    # client.close()
 
 
 
