@@ -114,7 +114,7 @@ Script running logs are stored `preprocess.log`. It stores how long each repo to
 
 ## Guide to running all of these
 
-I believe the easiest way to run this is to copy everything in my dir `/data2/michelle/GithubEntitlement` to your dir, change some of the addresses for file storage and starts from there because Senti4SD script is changed to allow parallel processing and Stanford Politeness API requires a specifically configured virtual environment to run.
+I believe the easiest way to run this is to copy everything in my dir `/data2/michelle/GithubEntitlement` to your dir, change some of the addresses for file storage and start from there because Senti4SD script is changed to allow parallel processing and Stanford Politeness API requires a specifically configured virtual environment to run.
 
 ## More features to come
 
