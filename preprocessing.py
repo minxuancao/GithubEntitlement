@@ -206,6 +206,154 @@ def process_comment(doc):
            "perspective_score": perspective_score,
             "text": text}
 
+def process_text_feature(db,issue_id,query_dict,non_repeat,issue_collection,comment_collection):
+    # check to see if the issue is already processed
+    if non_repeat:
+        id = "%s/%s/%d" % (query_dict["repo"], query_dict["owner"], issue_id)
+        if db[issue_collection].find_one({"_id": id}):
+            logging.info("%s already processed" % id)
+            return
+
+    issue_start = time.time();
+
+    query_dict["issue_id"] = issue_id  # set issue_id for querying
+
+    comments = db.issue_comments.find(query_dict) #get all comments
+
+    # take the top2 for perspective score;
+    perspective_scores = []
+
+    # set a data struc to store everything
+    total_comment_info = {
+        "total_reference": 0,
+        "total_url": 0,
+        "total_emoji": 0,
+        "total_mention": 0,
+        "total_plus_one": 0,
+        "total_text": "",
+    }
+
+    # Senti4SD document preparation
+    input_senti4sd_filename = "input_%s_%s_%d.csv" % (query_dict["owner"], query_dict["repo"], issue_id)
+    output_senti4sd_filename = "output_%s_%s_%d.csv" % (query_dict["owner"], query_dict["repo"], issue_id)
+    feature_senti4sd_filename = "extractedFeatures_%s_%s_%d.csv" % (query_dict["owner"], query_dict["repo"], issue_id)
+    f = open(senti4SD_address + input_senti4sd_filename, 'w')
+
+    comment_info_l = []
+    comment_sentence_l = []
+    # process comments
+    for comment in comments:
+
+        logging.debug("Issue id: %d Comment: %s " % (issue_id, comment))
+
+        comment_info = process_comment(comment)
+
+        if not comment_info["valid"]:  # if comment is not valid, go to next loop
+            continue
+
+        comment_info_l.append(comment_info)  # add valid comment_info into a list
+
+        sent_detector = nltk.data.load('tokenizers/punkt/english.pickle')
+        sentences = sent_detector.tokenize(comment_info["text"].strip())
+        comment_sentence_l.append(len(sentences))
+
+        total_comment_info["total_reference"] += comment_info["num_reference"]
+        total_comment_info["total_url"] += comment_info["num_url"]
+        total_comment_info["total_emoji"] += comment_info["num_emoji"]
+        total_comment_info["total_mention"] += comment_info["num_mention"]
+        total_comment_info["total_plus_one"] += comment_info["num_plus_one"]
+
+        if len(perspective_scores) > 2:
+            if min(perspective_scores) < comment_info["perspective_score"]:
+                _ = heapq.heappushpop(perspective_scores, comment_info["perspective_score"])
+        else:
+            perspective_scores.append(comment_info["perspective_score"])
+        # write all comments to 1 part
+        if total_comment_info["total_text"] == "":
+            total_comment_info["total_text"] += comment_info["text"]
+        else:
+            total_comment_info["total_text"] += " " + comment_info["text"]
+        f.write(comment_info["text"] + "\n")  # write to csv
+
+    # close input senti4sd file
+    f.close()
+
+    # check total_text here, it is empty skip the rest!!!
+    if total_comment_info["total_text"] == "":  # too little text, no need to write into database
+        return
+
+    if len(perspective_scores):
+        total_comment_info["perspective_score"] = sum(perspective_scores) / len(perspective_scores)
+    else:
+        total_comment_info["perspective_score"] = 0
+    # aggregate some features on the issue level ###!!! may need to change this part !!!###
+    total_comment_info["length"] = TextParser.get_length(total_comment_info["total_text"])
+    total_comment_info["avg_word_length"] = TextParser.get_avg_length(total_comment_info["total_text"])
+    total_comment_info["num_punct"] = TextParser.count_punct(total_comment_info["total_text"])
+    total_comment_info["num_QEMark"] = TextParser.count_QEMark(total_comment_info["total_text"])
+    total_comment_info["num_one_letter_word"] = TextParser.count_one_letter(total_comment_info["total_text"])
+    total_comment_info["num_capital"] = TextParser.count_captial(total_comment_info["total_text"])
+    total_comment_info["num_non_alpha_in_middle"] = TextParser.count_non_alpha_in_middle(
+        total_comment_info["total_text"])
+    total_comment_info["num_modal_word"] = TextParser.count_modal_word(total_comment_info["total_text"])
+    total_comment_info["num_unknown_word"] = TextParser.count_unknown_word(total_comment_info["total_text"])
+    total_comment_info["num_insult_word"] = TextParser.count_insult_word(total_comment_info["total_text"])
+
+    # sent to Senti4SD for score, we would want a result for each comment
+    senti_start = time.time()
+    senti_l = get_senti4SD(input_senti4sd_filename, output_senti4sd_filename,
+                           feature_senti4sd_filename)  # change this to returning a list
+
+    # for each comment_info add a senti4sd classification
+    for i in range(len(senti_l)):
+        comment_info_l[i]["senti_4sd"] = senti_l[i]
+
+    # calculate an aggregation
+    total_comment_info["senti4sd_positive_percentage"] = senti_l.count("positive") / len(senti_l)
+    total_comment_info["senti4sd_neutral_percentage"] = senti_l.count("neutral") / len(senti_l)
+    total_comment_info["senti4sd_negative_percentage"] = senti_l.count("negative") / len(senti_l)
+
+    # logging.info("senti4sd took %d" % (time.time()-senti_start))
+
+    # stanford politeness API
+    politeness_start = time.time()
+    # make a pickle file using coreNLP
+    coreNLP_parse(input_senti4sd_filename,
+                  comment_sentence_l)  # comment_l is a list that stores number of sentences each comment has
+
+    # pass this pickle to stanford politeness api
+    calculate_stanford_politeness_score(input_senti4sd_filename, output_senti4sd_filename)
+
+    # read from csv the score, the first one is for total, then for each comment
+    score_df = pd.read_csv(stanford_politeness_score_address + output_senti4sd_filename, header=None)
+    for row in score_df.itertuples():
+        if row.Index == 0:
+            total_comment_info["stanford_positive"] = row._1
+            total_comment_info["stanford_negative"] = row._2
+        else:
+            comment_info_l[row.Index - 1]["stanford_positive"] = row._1
+            comment_info_l[row.Index - 1]["stanford_negative"] = row._2
+
+    # logging.info("stanford took %d" % (time.time()-politeness_start))
+
+    # set_id
+    total_comment_info["repo"] = query_dict["repo"]
+    total_comment_info["owner"] = query_dict["owner"]
+    total_comment_info["issue_id"] = query_dict["issue_id"]
+    total_comment_info["_id"] = "%s/%s/%d" % (query_dict["repo"], query_dict["owner"], query_dict["issue_id"])
+
+    # log for checking to somewhere, not multi-process safe
+    # logging.debug(total_comment_info)
+
+    # insert total_comment_info to database
+    db[issue_collection].update_one({"_id": total_comment_info["_id"]}, total_comment_info, upsert=True) #update document with newly created features
+
+    # insert each comment_info to database
+    for comment_info in comment_info_l:
+        db[comment_collection].update_one({"_id": comment_info["_id"]}, comment_info, upsert=True)
+    # logging.info("%s processing took %d" % (query_dict, time.time() - issue_start))
+
+
 def consumer(repo,non_repeat,issue_collection,comment_collection):
 
     db = connect_Mongo()
@@ -216,152 +364,9 @@ def consumer(repo,non_repeat,issue_collection,comment_collection):
     #logging.info(query_dict)
     query_dict.pop("pull_request") #remove "pull_request" key
 
-    for issue_id in issue_ids:
+    process_text_feature(query_dict,non_repeat,issue_collection,comment_collection) # process features detailed in the write-up
 
-        # check to see if the issue is already processed
-        if non_repeat:
-            id = "%s/%s/%d" % (query_dict["repo"], query_dict["owner"], issue_id)
-            if db[issue_collection].find_one({"_id":id}):
-                logging.info("%s already processed" % id)
-                continue
-
-        #query all comments.
-        issue_start = time.time();
-
-        query_dict["issue_id"] = issue_id # set issue_id for querying
-
-        comments = db.issue_comments.find(query_dict)
-        #set a data struc to store everything
-
-        # take the top2 for perspective score; use a heap
-        perspective_scores = []
-        # concat text
-
-        total_comment_info = {
-            "total_reference": 0,
-            "total_url": 0,
-            "total_emoji": 0,
-            "total_mention": 0,
-            "total_plus_one": 0,
-            "total_text": "",
-        }
-
-        #Senti4SD document preparation
-        input_senti4sd_filename = "input_%s_%s_%d.csv" % (query_dict["owner"],query_dict["repo"],issue_id)
-        output_senti4sd_filename = "output_%s_%s_%d.csv" % (query_dict["owner"], query_dict["repo"], issue_id)
-        feature_senti4sd_filename = "extractedFeatures_%s_%s_%d.csv" % (query_dict["owner"], query_dict["repo"], issue_id)
-        f = open(senti4SD_address+input_senti4sd_filename,'w')
-
-        comment_info_l = []
-        comment_sentence_l = []
-        # process comments
-        for comment in comments:
-
-            logging.debug("Issue id: %d Comment: %s " % (issue_id,comment))
-
-            comment_info = process_comment(comment)
-
-            if not comment_info["valid"]: #if comment is not valid, go to next loop
-                continue
-
-            comment_info_l.append(comment_info) #add valid comment_info into a list
-
-            sent_detector = nltk.data.load('tokenizers/punkt/english.pickle')
-            sentences = sent_detector.tokenize(comment_info["text"].strip())
-            comment_sentence_l.append(len(sentences))
-
-            total_comment_info["total_reference"] += comment_info["num_reference"]
-            total_comment_info["total_url"] += comment_info["num_url"]
-            total_comment_info["total_emoji"] += comment_info["num_emoji"]
-            total_comment_info["total_mention"] += comment_info["num_mention"]
-            total_comment_info["total_plus_one"] += comment_info["num_plus_one"]
-
-            if len(perspective_scores) > 2:
-                if min(perspective_scores) < comment_info["perspective_score"]:
-                    _ = heapq.heappushpop(perspective_scores,comment_info["perspective_score"])
-            else:
-                perspective_scores.append(comment_info["perspective_score"])
-            #write all comments to 1 part
-            if total_comment_info["total_text"] == "":
-                total_comment_info["total_text"] += comment_info["text"]
-            else:
-                total_comment_info["total_text"] += " " + comment_info["text"]
-            f.write(comment_info["text"]+"\n") #write to csv
-
-        #close input senti4sd file
-        f.close()
-
-        #check total_text here, it is empty skip the rest!!!
-        if total_comment_info["total_text"] == "": #too little text, no need to write into database
-            continue
-
-        if len(perspective_scores):
-            total_comment_info["perspective_score"] = sum(perspective_scores)/len(perspective_scores)
-        else:
-            total_comment_info["perspective_score"] = 0
-        #aggregate some features on the issue level ###!!! may need to change this part !!!###
-        total_comment_info["length"] = TextParser.get_length(total_comment_info["total_text"])
-        total_comment_info["avg_word_length"] = TextParser.get_avg_length(total_comment_info["total_text"])
-        total_comment_info["num_punct"] = TextParser.count_punct(total_comment_info["total_text"])
-        total_comment_info["num_QEMark"] = TextParser.count_QEMark(total_comment_info["total_text"])
-        total_comment_info["num_one_letter_word"] = TextParser.count_one_letter(total_comment_info["total_text"])
-        total_comment_info["num_capital"] = TextParser.count_captial(total_comment_info["total_text"])
-        total_comment_info["num_non_alpha_in_middle"] = TextParser.count_non_alpha_in_middle(total_comment_info["total_text"])
-        total_comment_info["num_modal_word"] = TextParser.count_modal_word(total_comment_info["total_text"])
-        total_comment_info["num_unknown_word"] = TextParser.count_unknown_word(total_comment_info["total_text"])
-        total_comment_info["num_insult_word"] = TextParser.count_insult_word(total_comment_info["total_text"])
-
-        #sent to Senti4SD for score, we would want a result for each comment
-        senti_start = time.time()
-        senti_l = get_senti4SD(input_senti4sd_filename,output_senti4sd_filename,feature_senti4sd_filename) #change this to returning a list
-
-        # for each comment_info add a senti4sd classification
-        for i in range(len(senti_l)):
-            comment_info_l[i]["senti_4sd"] = senti_l[i]
-
-        #calculate an aggregation
-        total_comment_info["senti4sd_positive_percentage"] =  senti_l.count("positive")/len(senti_l)
-        total_comment_info["senti4sd_neutral_percentage"] = senti_l.count("neutral")/len(senti_l)
-        total_comment_info["senti4sd_negative_percentage"] = senti_l.count("negative")/len(senti_l)
-
-        #logging.info("senti4sd took %d" % (time.time()-senti_start))
-
-        #stanford politeness API
-        politeness_start = time.time()
-        #make a pickle file using coreNLP
-        coreNLP_parse(input_senti4sd_filename,comment_sentence_l) #comment_l is a list that stores number of sentences each comment has
-
-        #pass this pickle to stanford politeness api
-        calculate_stanford_politeness_score(input_senti4sd_filename,output_senti4sd_filename)
-
-        #read from csv the score, the first one is for total, then for each comment
-        score_df = pd.read_csv(stanford_politeness_score_address+output_senti4sd_filename,header=None)
-        for row in score_df.itertuples():
-            if row.Index == 0:
-                total_comment_info["stanford_positive"] = row._1
-                total_comment_info["stanford_negative"] = row._2
-            else:
-                comment_info_l[row.Index-1]["stanford_positive"] = row._1
-                comment_info_l[row.Index-1]["stanford_negative"] = row._2
-
-        #logging.info("stanford took %d" % (time.time()-politeness_start))
-
-        #set_id
-        total_comment_info["repo"] = query_dict["repo"]
-        total_comment_info["owner"] = query_dict["owner"]
-        total_comment_info["issue_id"] = query_dict["issue_id"]
-        total_comment_info["_id"] = "%s/%s/%d" % (query_dict["repo"],query_dict["owner"],query_dict["issue_id"])
-
-        #log for checking to somewhere, not multi-process safe
-        #logging.debug(total_comment_info)
-
-        # insert total_comment_info to database
-        db[issue_collection].replace_one({"_id":total_comment_info["_id"]},total_comment_info,upsert=True)
-
-        # insert each comment_info to database
-        for comment_info in comment_info_l:
-            db[comment_collection].replace_one({"_id":comment_info["_id"]},comment_info,upsert=True) 
-        #logging.info("%s processing took %d" % (query_dict, time.time() - issue_start))
+    ### could add other features to preprocess.###
 
     return query_dict
 
@@ -393,7 +398,7 @@ if __name__ == "__main__":
     pool = mp.Pool(processes=args.num_processor)
 
     start = time.time()
-    chunk_size = 1 # set a large chunksize when repos is large!!!
+
     for repo in pool.imap_unordered(partial(consumer,non_repeat=non_repeat,issue_collection=args.issue,comment_collection=args.comment),repos):
         logging.info("Processing %s took %d s " % (repo, time.time()-start))
     pool.close()
